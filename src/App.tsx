@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 const OrganizationalMapping = () => {
   // Define the custom colors as reusable style variables
@@ -7,7 +7,6 @@ const OrganizationalMapping = () => {
     secondary: "#F5F7FA",
     text: {
       primary: "#333333", // Main text color
-      secondary: "#2C3E50", // Secondary text color
       buttons: "#FFFFFF", // Text color for default buttons
       selectedButtons: "#FFFFFF", // Text color for selected buttons
     },
@@ -222,83 +221,52 @@ const OrganizationalMapping = () => {
     id: string;
   } | null>(null);
 
-  // Get filtered models based on selection
-  const getFilteredModels = () => {
-    if (selectedPractice) {
-      // Get models that use the selected practice
-      return relationships.models.filter((model) =>
-        model.practices.includes(selectedPractice)
-      );
-    } else if (selectedTool) {
-      // Get models that are linked to practices that use the selected tool
-      const practicesWithTool = relationships.practices
-        .filter((practice) => practice.tools.includes(selectedTool))
-        .map((practice) => practice.id);
+  // Compute the ids related to an active item across every column, following
+  // the connections transitively (model -> practices -> tools and back). Used
+  // to dim unrelated items in place. Returns null when nothing is active, in
+  // which case every item is shown at full strength.
+  const getRelatedSets = (
+    active: { type: "model" | "practice" | "tool"; id: string } | null
+  ) => {
+    if (!active) return null;
 
-      return relationships.models.filter((model) =>
-        model.practices.some((practiceId) =>
-          practicesWithTool.includes(practiceId)
-        )
-      );
+    const models = new Set<string>();
+    const practices = new Set<string>();
+    const tools = new Set<string>();
+
+    if (active.type === "model") {
+      const model = relationships.models.find((m) => m.id === active.id);
+      if (model) {
+        models.add(model.id);
+        model.practices.forEach((practiceId) => {
+          practices.add(practiceId);
+          relationships.practices
+            .find((p) => p.id === practiceId)
+            ?.tools.forEach((toolId) => tools.add(toolId));
+        });
+      }
+    } else if (active.type === "practice") {
+      const practice = relationships.practices.find((p) => p.id === active.id);
+      if (practice) {
+        practices.add(practice.id);
+        practice.tools.forEach((toolId) => tools.add(toolId));
+        relationships.models
+          .filter((m) => m.practices.includes(practice.id))
+          .forEach((m) => models.add(m.id));
+      }
+    } else {
+      tools.add(active.id);
+      relationships.practices
+        .filter((p) => p.tools.includes(active.id))
+        .forEach((practice) => {
+          practices.add(practice.id);
+          relationships.models
+            .filter((m) => m.practices.includes(practice.id))
+            .forEach((m) => models.add(m.id));
+        });
     }
 
-    return relationships.models;
-  };
-
-  // Get filtered practices based on selection
-  const getFilteredPractices = () => {
-    if (selectedModel) {
-      // Get practices used by the selected model
-      const model = relationships.models.find((m) => m.id === selectedModel);
-      if (!model) return relationships.practices;
-
-      return relationships.practices.filter((practice) =>
-        model.practices.includes(practice.id)
-      );
-    } else if (selectedTool) {
-      // Get practices that use the selected tool
-      return relationships.practices.filter((practice) =>
-        practice.tools.includes(selectedTool)
-      );
-    }
-
-    return relationships.practices;
-  };
-
-  // Get filtered tools based on selection
-  const getFilteredTools = () => {
-    if (selectedPractice) {
-      // Get tools used by the selected practice
-      const practice = relationships.practices.find(
-        (p) => p.id === selectedPractice
-      );
-      if (!practice) return relationships.tools;
-
-      return relationships.tools.filter((tool) =>
-        practice.tools.includes(tool.id)
-      );
-    } else if (selectedModel) {
-      // Get tools used by practices related to the selected model
-      const model = relationships.models.find((m) => m.id === selectedModel);
-      if (!model) return relationships.tools;
-
-      // Get all tool IDs from practices related to the selected model
-      const toolIds = model.practices.flatMap((practiceId) => {
-        const practice = relationships.practices.find(
-          (p) => p.id === practiceId
-        );
-        return practice ? practice.tools : [];
-      });
-
-      // Filter out duplicate tool IDs
-      const uniqueToolIds = [...new Set(toolIds)];
-
-      return relationships.tools.filter((tool) =>
-        uniqueToolIds.includes(tool.id)
-      );
-    }
-
-    return relationships.tools;
+    return { models, practices, tools };
   };
 
   // Handle click on model
@@ -340,107 +308,123 @@ const OrganizationalMapping = () => {
     }
   };
 
-  // Handle double click for navigation (iframe-compatible)
-  const handleDoubleClick = (
+  // WordPress site that hosts the detailed pages this map links out to.
+  const SITE_ORIGIN = "https://democratic-tech.co.uk";
+
+  // Navigate to an item's detailed page. When embedded in the WordPress site we
+  // post a scoped message to the parent frame (which handles routing); when the
+  // map is opened standalone (e.g. the GitHub Pages build) we open the real site
+  // URL directly so navigation still works outside the iframe.
+  const navigate = (type: "model" | "practice" | "tool", id: string) => {
+    const path = `/${type}s/${id}`;
+    const isEmbedded = window.parent !== window;
+
+    if (isEmbedded) {
+      window.parent.postMessage({ type: "navigation", path }, SITE_ORIGIN);
+    } else {
+      window.open(`${SITE_ORIGIN}${path}`, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  // A single "active" item drives connection highlighting. Hovering an item
+  // previews its connections (desktop pointers); selecting one locks them in so
+  // they persist after the pointer leaves, and so the model works on touch and
+  // keyboard where hover is unavailable.
+  const selectedItem = selectedModel
+    ? { type: "model" as const, id: selectedModel }
+    : selectedPractice
+      ? { type: "practice" as const, id: selectedPractice }
+      : selectedTool
+        ? { type: "tool" as const, id: selectedTool }
+        : null;
+
+  const activeItem = hoveredItem ?? selectedItem;
+  const related = getRelatedSets(activeItem);
+
+  const columns = {
+    model: relationships.models,
+    practice: relationships.practices,
+    tool: relationships.tools,
+  } as const;
+
+  const activeName = selectedItem
+    ? columns[selectedItem.type].find((entry) => entry.id === selectedItem.id)
+        ?.name
+    : null;
+
+  // Render one column of items. All items stay rendered (no reflow); items that
+  // are not connected to the active item are dimmed in place.
+  const renderColumn = (
     type: "model" | "practice" | "tool",
-    id: string
+    headingId: string,
+    items: readonly { id: string; name: string }[],
+    selectedId: string | null,
+    onSelect: (id: string) => void
   ) => {
-    // Create URL paths that match your WordPress site structure
-    let path;
+    const relatedSet = related
+      ? type === "model"
+        ? related.models
+        : type === "practice"
+          ? related.practices
+          : related.tools
+      : null;
 
-    switch (type) {
-      case "model":
-        path = `/models/${id}`;
-        break;
-      case "practice":
-        path = `/practices/${id}`;
-        break;
-      case "tool":
-        path = `/tools/${id}`;
-        break;
-      default:
-        return;
-    }
+    return (
+      <ul aria-labelledby={headingId} className="list-none m-0 p-0">
+        {items.map((item) => {
+          const isSelected = selectedId === item.id;
+          const isHovered =
+            hoveredItem?.type === type && hoveredItem.id === item.id;
+          const dimmed = relatedSet ? !relatedSet.has(item.id) : false;
+          const background = isSelected
+            ? colors.button.selected
+            : isHovered
+              ? colors.button.hover
+              : colors.button.default;
 
-    // Send a message to the parent window (WordPress)
-    try {
-      // First approach: Try to communicate with parent frame
-      window.parent.postMessage(
-        {
-          type: "navigation",
-          path: path,
-        },
-        "*"
-      );
-
-      // Fallback approach: Open in new tab if iframe communication fails
-      console.log(`Navigation requested to: ${path}`);
-    } catch (error) {
-      console.error("Could not communicate with parent frame", error);
-    }
-  };
-
-  // Filtered data for rendering - maintain original order
-  const filteredModels = getFilteredModels();
-  const filteredPractices = getFilteredPractices();
-  const filteredTools = getFilteredTools();
-
-  // References for scroll containers
-  const modelsContainerRef = React.useRef<HTMLDivElement>(null);
-  const practicesContainerRef = React.useRef<HTMLDivElement>(null);
-  const toolsContainerRef = React.useRef<HTMLDivElement>(null);
-
-  // Scroll to selected items when they change
-  React.useEffect(() => {
-    if (selectedModel && modelsContainerRef.current) {
-      const selectedElement = modelsContainerRef.current.querySelector(
-        `[data-id="${selectedModel}"]`
-      );
-      if (selectedElement) {
-        selectedElement.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
-    }
-  }, [selectedModel]);
-
-  React.useEffect(() => {
-    if (selectedPractice && practicesContainerRef.current) {
-      const selectedElement = practicesContainerRef.current.querySelector(
-        `[data-id="${selectedPractice}"]`
-      );
-      if (selectedElement) {
-        selectedElement.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
-    }
-  }, [selectedPractice]);
-
-  React.useEffect(() => {
-    if (selectedTool && toolsContainerRef.current) {
-      const selectedElement = toolsContainerRef.current.querySelector(
-        `[data-id="${selectedTool}"]`
-      );
-      if (selectedElement) {
-        selectedElement.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
-    }
-  }, [selectedTool]);
-
-  // CSS custom properties for inline styles
-  const buttonDefaultStyle = {
-    backgroundColor: colors.button.default,
-    color: colors.text.buttons,
-  };
-  const buttonSelectedStyle = {
-    backgroundColor: colors.button.selected,
-    color: colors.text.selectedButtons,
+          return (
+            <li
+              key={item.id}
+              className="mb-2 transition-opacity duration-300"
+              style={{ opacity: dimmed ? 0.35 : 1 }}
+            >
+              <div className="flex items-stretch gap-1">
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  className="flex-1 text-left p-3 rounded cursor-pointer transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
+                  style={{
+                    backgroundColor: background,
+                    color: colors.text.buttons,
+                  }}
+                  onClick={() => onSelect(item.id)}
+                  onMouseEnter={() => setHoveredItem({ type, id: item.id })}
+                  onMouseLeave={() => setHoveredItem(null)}
+                >
+                  {item.name}
+                </button>
+                {(isSelected || isHovered) && (
+                  <button
+                    type="button"
+                    className="shrink-0 px-3 rounded cursor-pointer text-sm font-medium transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
+                    style={{
+                      backgroundColor: colors.highlight,
+                      color: colors.text.buttons,
+                    }}
+                    onClick={() => navigate(type, item.id)}
+                    onMouseEnter={() => setHoveredItem({ type, id: item.id })}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  >
+                    <span aria-hidden="true">Open ↗</span>
+                    <span className="sr-only">Open {item.name} page</span>
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
   };
 
   return (
@@ -449,155 +433,75 @@ const OrganizationalMapping = () => {
       style={{ backgroundColor: colors.primary, color: colors.text.primary }}
     >
       <div className="flex flex-col md:flex-row justify-between gap-4">
-        {/* Column 1: Organizational Models */}
+        {/* Column 1: Democratic governance models */}
         <div className="flex-1">
-          <h3 className="text-xl font-bold mb-4 text-center">
+          <h3
+            id="col-models"
+            className="text-xl font-bold mb-4 text-center"
+          >
             Democratic governance models
           </h3>
-          <div style={{ backgroundColor: colors.secondary }}>
-            {filteredModels.map((model) => (
-              <div
-                key={model.id}
-                data-id={model.id}
-                className={`p-3 mb-2 rounded cursor-pointer transition-all duration-300 relative`}
-                style={{
-                  ...(selectedModel === model.id
-                    ? buttonSelectedStyle
-                    : buttonDefaultStyle),
-                  ...(hoveredItem &&
-                  hoveredItem.type === "practice" &&
-                  relationships.models.find((m) =>
-                    m.practices.includes(hoveredItem.id)
-                  )?.id === model.id
-                    ? { borderLeft: `4px solid ${colors.highlight}` }
-                    : {}),
-                }}
-                onMouseOver={(e) => {
-                  if (selectedModel !== model.id) {
-                    e.currentTarget.style.backgroundColor = colors.button.hover;
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (selectedModel !== model.id) {
-                    e.currentTarget.style.backgroundColor =
-                      colors.button.default;
-                  }
-                }}
-                onClick={() => handleModelClick(model.id)}
-                onDoubleClick={() => handleDoubleClick("model", model.id)}
-                onMouseEnter={() =>
-                  setHoveredItem({ type: "model", id: model.id })
-                }
-                onMouseLeave={() => setHoveredItem(null)}
-              >
-                {model.name}
-              </div>
-            ))}
+          <div
+            className="p-2 rounded"
+            style={{ backgroundColor: colors.secondary }}
+          >
+            {renderColumn(
+              "model",
+              "col-models",
+              relationships.models,
+              selectedModel,
+              handleModelClick
+            )}
           </div>
         </div>
 
-        {/* Column 2: Practices */}
+        {/* Column 2: Democratic practices */}
         <div className="flex-1">
-          <h3 className="text-xl font-bold mb-4 text-center">
+          <h3
+            id="col-practices"
+            className="text-xl font-bold mb-4 text-center"
+          >
             Democratic practices
           </h3>
-          <div style={{ backgroundColor: colors.secondary }}>
-            {filteredPractices.map((practice) => (
-              <div
-                key={practice.id}
-                data-id={practice.id}
-                className={`p-3 mb-2 rounded cursor-pointer transition-all duration-300`}
-                style={{
-                  ...(selectedPractice === practice.id
-                    ? buttonSelectedStyle
-                    : buttonDefaultStyle),
-                  ...(hoveredItem &&
-                  ((hoveredItem.type === "model" &&
-                    relationships.models
-                      .find((m) => m.id === hoveredItem.id)
-                      ?.practices.includes(practice.id)) ||
-                    (hoveredItem.type === "tool" &&
-                      practice.tools.includes(hoveredItem.id)))
-                    ? { borderLeft: `4px solid ${colors.highlight}` }
-                    : {}),
-                }}
-                onMouseOver={(e) => {
-                  if (selectedPractice !== practice.id) {
-                    e.currentTarget.style.backgroundColor = colors.button.hover;
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (selectedPractice !== practice.id) {
-                    e.currentTarget.style.backgroundColor =
-                      colors.button.default;
-                  }
-                }}
-                onClick={() => handlePracticeClick(practice.id)}
-                onDoubleClick={() => handleDoubleClick("practice", practice.id)}
-                onMouseEnter={() =>
-                  setHoveredItem({ type: "practice", id: practice.id })
-                }
-                onMouseLeave={() => setHoveredItem(null)}
-              >
-                {practice.name}
-              </div>
-            ))}
+          <div
+            className="p-2 rounded"
+            style={{ backgroundColor: colors.secondary }}
+          >
+            {renderColumn(
+              "practice",
+              "col-practices",
+              relationships.practices,
+              selectedPractice,
+              handlePracticeClick
+            )}
           </div>
         </div>
 
-        {/* Column 3: Tool Types */}
+        {/* Column 3: Democratic tools */}
         <div className="flex-1">
-          <h3 className="text-xl font-bold mb-4 text-center">
+          <h3 id="col-tools" className="text-xl font-bold mb-4 text-center">
             Democratic tools
           </h3>
-          <div style={{ backgroundColor: colors.secondary }}>
-            {filteredTools.map((tool) => (
-              <div
-                key={tool.id}
-                data-id={tool.id}
-                className={`p-3 mb-2 rounded cursor-pointer transition-all duration-300`}
-                style={{
-                  ...(selectedTool === tool.id
-                    ? buttonSelectedStyle
-                    : buttonDefaultStyle),
-                  ...(hoveredItem &&
-                  hoveredItem.type === "practice" &&
-                  relationships.practices
-                    .find((p) => p.id === hoveredItem.id)
-                    ?.tools.includes(tool.id)
-                    ? { borderLeft: `4px solid ${colors.highlight}` }
-                    : {}),
-                }}
-                onMouseOver={(e) => {
-                  if (selectedTool !== tool.id) {
-                    e.currentTarget.style.backgroundColor = colors.button.hover;
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (selectedTool !== tool.id) {
-                    e.currentTarget.style.backgroundColor =
-                      colors.button.default;
-                  }
-                }}
-                onClick={() => handleToolClick(tool.id)}
-                onDoubleClick={() => handleDoubleClick("tool", tool.id)}
-                onMouseEnter={() =>
-                  setHoveredItem({ type: "tool", id: tool.id })
-                }
-                onMouseLeave={() => setHoveredItem(null)}
-              >
-                {tool.name}
-              </div>
-            ))}
+          <div
+            className="p-2 rounded"
+            style={{ backgroundColor: colors.secondary }}
+          >
+            {renderColumn(
+              "tool",
+              "col-tools",
+              relationships.tools,
+              selectedTool,
+              handleToolClick
+            )}
           </div>
         </div>
       </div>
 
-      <div className="mt-6 text-center text-sm">
+      <div className="mt-6 text-center text-sm" aria-live="polite">
         <p>
-          {selectedModel || selectedPractice || selectedTool
-            ? "Showing filtered relationships. Click selected items to clear filters."
-            : "Click on any item to see related elements. Double-click to visit the detailed page."}
+          {selectedItem
+            ? `Showing connections for “${activeName}”. Select it again to clear, or choose “Open ↗” to visit its detailed page.`
+            : "Hover an item to preview its connections, or select one to keep them highlighted. Then choose “Open ↗” to visit its detailed page."}
         </p>
       </div>
     </div>
