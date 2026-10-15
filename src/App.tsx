@@ -1,4 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+// Below this width the three-column view becomes three collapsible lists.
+// 640px matches Tailwind's `sm` breakpoint.
+const NARROW_QUERY = "(max-width: 639px)";
+
+const useIsNarrow = () => {
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(NARROW_QUERY).matches
+      : false
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia(NARROW_QUERY);
+    const update = () => setIsNarrow(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isNarrow;
+};
 
 const OrganizationalMapping = () => {
   // Define the custom colors as reusable style variables
@@ -315,6 +338,8 @@ const OrganizationalMapping = () => {
     ],
   };
 
+  const isNarrow = useIsNarrow();
+
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedPractice, setSelectedPractice] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
@@ -500,8 +525,12 @@ const OrganizationalMapping = () => {
                     color: colors.text.buttons,
                   }}
                   onClick={() => onSelect(item.id)}
-                  onMouseEnter={() => setHoveredItem({ type, id: item.id })}
-                  onMouseLeave={() => setHoveredItem(null)}
+                  onMouseEnter={
+                    isNarrow
+                      ? undefined
+                      : () => setHoveredItem({ type, id: item.id })
+                  }
+                  onMouseLeave={isNarrow ? undefined : () => setHoveredItem(null)}
                 >
                   {item.name}
                 </button>
@@ -514,8 +543,14 @@ const OrganizationalMapping = () => {
                       color: colors.text.buttons,
                     }}
                     onClick={() => navigate(type, item.id)}
-                    onMouseEnter={() => setHoveredItem({ type, id: item.id })}
-                    onMouseLeave={() => setHoveredItem(null)}
+                    onMouseEnter={
+                      isNarrow
+                        ? undefined
+                        : () => setHoveredItem({ type, id: item.id })
+                    }
+                    onMouseLeave={
+                      isNarrow ? undefined : () => setHoveredItem(null)
+                    }
                   >
                     <span aria-hidden="true">Open ↗</span>
                     <span className="sr-only">Open {item.name} page</span>
@@ -529,83 +564,113 @@ const OrganizationalMapping = () => {
     );
   };
 
+  const layers = [
+    {
+      type: "model" as const,
+      headingId: "col-models",
+      title: "Democratic governance models",
+      items: relationships.models,
+      selectedId: selectedModel,
+      onSelect: handleModelClick,
+      related: related?.models ?? null,
+    },
+    {
+      type: "practice" as const,
+      headingId: "col-practices",
+      title: "Democratic practices",
+      items: relationships.practices,
+      selectedId: selectedPractice,
+      onSelect: handlePracticeClick,
+      related: related?.practices ?? null,
+    },
+    {
+      type: "tool" as const,
+      headingId: "col-tools",
+      title: "Democratic tools",
+      items: relationships.tools,
+      selectedId: selectedTool,
+      onSelect: handleToolClick,
+      related: related?.tools ?? null,
+    },
+  ];
+
+  // The instruction sits at the top of the app so it is seen before the lists.
+  // On touch-sized screens hover is unavailable, so the wording drops it.
+  const instruction = selectedItem
+    ? `Showing connections for \u201c${activeName}\u201d. Select it again to clear, or choose \u201cOpen \u2197\u201d to visit its detailed page.`
+    : isNarrow
+      ? "Open a list, then select an item to highlight its connections in the other lists. Then choose \u201cOpen \u2197\u201d to visit its detailed page."
+      : "Hover an item to preview its connections, or select one to keep them highlighted. Then choose \u201cOpen \u2197\u201d to visit its detailed page.";
+
   return (
     <div
-      className="w-full p-6 rounded-lg"
+      className="w-full min-h-screen box-border p-3 sm:p-6"
       style={{ backgroundColor: colors.primary, color: colors.text.primary }}
     >
-      <div className="flex flex-col md:flex-row justify-between gap-4">
-        {/* Column 1: Democratic governance models */}
-        <div className="flex-1">
-          <h3
-            id="col-models"
-            className="text-xl font-bold mb-4 text-center"
-          >
-            Democratic governance models
-          </h3>
-          <div
-            className="p-2 rounded"
-            style={{ backgroundColor: colors.secondary }}
-          >
-            {renderColumn(
-              "model",
-              "col-models",
-              relationships.models,
-              selectedModel,
-              handleModelClick
-            )}
-          </div>
-        </div>
-
-        {/* Column 2: Democratic practices */}
-        <div className="flex-1">
-          <h3
-            id="col-practices"
-            className="text-xl font-bold mb-4 text-center"
-          >
-            Democratic practices
-          </h3>
-          <div
-            className="p-2 rounded"
-            style={{ backgroundColor: colors.secondary }}
-          >
-            {renderColumn(
-              "practice",
-              "col-practices",
-              relationships.practices,
-              selectedPractice,
-              handlePracticeClick
-            )}
-          </div>
-        </div>
-
-        {/* Column 3: Democratic tools */}
-        <div className="flex-1">
-          <h3 id="col-tools" className="text-xl font-bold mb-4 text-center">
-            Democratic tools
-          </h3>
-          <div
-            className="p-2 rounded"
-            style={{ backgroundColor: colors.secondary }}
-          >
-            {renderColumn(
-              "tool",
-              "col-tools",
-              relationships.tools,
-              selectedTool,
-              handleToolClick
-            )}
-          </div>
-        </div>
+      <div
+        className="mb-4 text-center text-sm sm:text-base"
+        aria-live="polite"
+      >
+        <p>{instruction}</p>
       </div>
 
-      <div className="mt-6 text-center text-sm" aria-live="polite">
-        <p>
-          {selectedItem
-            ? `Showing connections for “${activeName}”. Select it again to clear, or choose “Open ↗” to visit its detailed page.`
-            : "Hover an item to preview its connections, or select one to keep them highlighted. Then choose “Open ↗” to visit its detailed page."}
-        </p>
-      </div>
+      {isNarrow ? (
+        <div className="flex flex-col gap-3">
+          {layers.map((layer, index) => (
+            <details
+              key={layer.type}
+              className="rounded"
+              style={{ backgroundColor: colors.secondary }}
+              open={index === 0 ? true : undefined}
+            >
+              <summary
+                className="cursor-pointer p-3 font-bold text-lg flex items-center justify-between gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              >
+                <span id={layer.headingId}>{layer.title}</span>
+                <span className="text-sm font-normal">
+                  {layer.related
+                    ? `${layer.related.size} connected`
+                    : `${layer.items.length} items`}
+                </span>
+              </summary>
+              <div className="p-2 pt-0">
+                {renderColumn(
+                  layer.type,
+                  layer.headingId,
+                  layer.items,
+                  layer.selectedId,
+                  layer.onSelect
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col md:flex-row justify-between gap-4">
+          {layers.map((layer) => (
+            <div key={layer.type} className="flex-1">
+              <h3
+                id={layer.headingId}
+                className="text-xl font-bold mb-4 text-center"
+              >
+                {layer.title}
+              </h3>
+              <div
+                className="p-2 rounded"
+                style={{ backgroundColor: colors.secondary }}
+              >
+                {renderColumn(
+                  layer.type,
+                  layer.headingId,
+                  layer.items,
+                  layer.selectedId,
+                  layer.onSelect
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
