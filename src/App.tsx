@@ -18,31 +18,60 @@ const OrganizationalMapping = () => {
     highlight: "#23CE6B", // Highlight color
   };
 
-  // Define the mapping relationships with fixed case-sensitivity
+  // Button ids are CampusPress slugs. Two labels do not match their slug:
+  // Delegated voting is still /practices/delegated-deliberation/, and
+  // Revisability is still /practices/revisable-rules/.
   const relationships = {
     models: [
       {
-        id: "traditional-cooperative",
+        id: "traditional-cooperative-governance-model",
         name: "Traditional cooperative governance model",
         practices: [
           "equal-voting",
-          "delegated-deliberation",
+          "parliamentary-procedure-roberts-rules-of-order",
           "deliberative-decision-making",
+          "consent-based-decision-making",
+          "open-working",
+          "revisable-rules",
         ],
       },
       {
-        id: "public-commons",
+        id: "multi-stakeholder-cooperative-governance",
+        name: "Multi-stakeholder cooperative governance",
+        practices: [
+          "weighted-voting",
+          "ranked-choice-voting",
+          "deliberative-decision-making",
+          "rotating-leadership",
+          "consent-based-decision-making",
+          "open-working",
+          "open-recognition",
+        ],
+      },
+      {
+        id: "public-commons-partnerships",
         name: "Public-commons partnerships (PCPs)",
-        practices: ["weighted-voting", "distributed-leadership"],
+        practices: [
+          "participatory-budgeting",
+          "consent-based-decision-making",
+          "open-working",
+        ],
       },
       {
         id: "sociocracy",
         name: "Sociocracy",
         practices: [
           "consent-based-decision-making",
+          "consensus-decision-making",
+          "circle-working",
+          "rotating-leadership",
+          "check-ins",
           "distributed-leadership",
+          "deliberative-decision-making",
+          "equal-voting",
+          "non-violent-communication",
           "open-working",
-          "participatory-budgeting",
+          "revisable-rules",
         ],
       },
       {
@@ -50,50 +79,54 @@ const OrganizationalMapping = () => {
         name: "Open cooperativism",
         practices: [
           "open-working",
-          "open-recognition",
-          "lazy-consensus",
+          "consensus-decision-making",
           "consent-based-decision-making",
-          "delegated-deliberation",
-          "deliberative-decision-making",
-          "participatory-budgeting",
+          "circle-working",
+          "check-ins",
           "distributed-leadership",
-          "contributive-accounting",
+          "weighted-voting",
+        ],
+      },
+      {
+        id: "peer-governance",
+        name: "Peer governance",
+        practices: [
+          "open-working",
+          "lazy-consensus",
+          "reputation-based-voting",
         ],
       },
       {
         id: "daos",
         name: "Decentralized Autonomous Organizations (DAOs)",
         practices: [
-          "reputation-based-voting",
           "weighted-voting",
-          "quadratic-voting",
           "participatory-budgeting",
+          "consent-based-decision-making",
           "distributed-leadership",
-          "open-recognition",
         ],
       },
       {
         id: "discos",
         name: "Distributed Cooperative Organizations (DisCOs)",
         practices: [
+          "consent-based-decision-making",
+          "distributed-leadership",
           "contributive-accounting",
           "open-working",
-          "open-recognition",
-          "participatory-budgeting",
+          "non-violent-communication",
         ],
       },
       {
         id: "liquid-democracy",
         name: "Liquid democracy",
         practices: [
-          "weighted-voting",
-          "quadratic-voting",
-          "reputation-based-voting",
+          "equal-voting",
           "delegated-deliberation",
-          "distributed-leadership",
-          "open-recognition",
-          "open-working",
+          "ranked-choice-voting",
+          "consent-based-decision-making",
           "participatory-budgeting",
+          "open-working",
         ],
       },
     ],
@@ -101,20 +134,57 @@ const OrganizationalMapping = () => {
       {
         id: "equal-voting",
         name: "Equal voting",
-        tools: ["general-assembly", "digital-voting-tools"],
+        tools: [
+          "deliberation-tools",
+          "digital-voting-tools",
+          "living-documentation-tools",
+        ],
+      },
+      {
+        id: "ranked-choice-voting",
+        name: "Ranked choice voting",
+        tools: ["digital-voting-tools", "living-documentation-tools"],
       },
       {
         id: "delegated-deliberation",
-        name: "Delegated deliberation",
-        tools: ["deliberation-tools", "board-of-directors", "governance-codes"],
+        name: "Delegated voting",
+        tools: ["digital-voting-tools", "deliberation-tools"],
+      },
+      {
+        id: "weighted-voting",
+        name: "Weighted voting",
+        tools: [
+          "deliberation-tools",
+          "digital-voting-tools",
+          "living-documentation-tools",
+        ],
+      },
+      {
+        id: "reputation-based-voting",
+        name: "Reputation-based voting",
+        tools: [
+          "contribution-tracking-tools",
+          "peer-recognition-tools",
+          "deliberation-tools",
+        ],
       },
       {
         id: "consensus-decision-making",
         name: "Consensus decision-making",
+        tools: ["deliberation-tools", "living-documentation-tools"],
+      },
+      {
+        id: "consent-based-decision-making",
+        name: "Consent-based decision-making",
+        tools: ["deliberation-tools", "living-documentation-tools"],
+      },
+      {
+        id: "lazy-consensus",
+        name: "Lazy consensus",
         tools: [
           "deliberation-tools",
-          "digital-voting-tools",
-          "group-facilitation-methods",
+          "living-documentation-tools",
+          "project-management-tools",
         ],
       },
       {
@@ -124,26 +194,16 @@ const OrganizationalMapping = () => {
           "deliberation-tools",
           "living-documentation-tools",
           "group-facilitation-methods",
-          "board-of-directors",
-          "digital-voting-tools",
+          "participatory-budgeting-tools",
         ],
       },
       {
-        id: "lazy-consensus",
-        name: "Lazy consensus",
+        id: "parliamentary-procedure-roberts-rules-of-order",
+        name: "Parliamentary procedure (Robert's Rules of Order)",
         tools: [
-          "deliberation-tools",
-          "living-documentation-tools",
-          "digital-voting-tools",
-        ],
-      },
-      {
-        id: "consent-based-decision-making",
-        name: "Consent-based decision-making",
-        tools: [
+          "governance-codes",
           "deliberation-tools",
           "digital-voting-tools",
-          "group-facilitation-methods",
           "living-documentation-tools",
         ],
       },
@@ -152,51 +212,91 @@ const OrganizationalMapping = () => {
         name: "Distributed leadership",
         tools: [
           "living-documentation-tools",
+          "deliberation-tools",
+          "capacity-planning-tools",
+          "project-management-tools",
+        ],
+      },
+      {
+        id: "rotating-leadership",
+        name: "Rotating leadership",
+        tools: [
+          "living-documentation-tools",
           "capacity-planning-tools",
           "deliberation-tools",
-          "participatory-budgeting-tools",
+        ],
+      },
+      {
+        id: "circle-working",
+        name: "Circle working",
+        tools: [
+          "living-documentation-tools",
+          "deliberation-tools",
+          "capacity-planning-tools",
+        ],
+      },
+      {
+        id: "check-ins",
+        name: "Check-ins",
+        tools: [
+          "deliberation-tools",
+          "living-documentation-tools",
+          "capacity-planning-tools",
+          "group-facilitation-methods",
+        ],
+      },
+      {
+        id: "non-violent-communication",
+        name: "Non-violent communication",
+        tools: ["deliberation-tools", "group-facilitation-methods"],
+      },
+      {
+        id: "open-working",
+        name: "Open working",
+        tools: [
+          "living-documentation-tools",
+          "deliberation-tools",
+          "capacity-planning-tools",
+        ],
+      },
+      {
+        id: "revisable-rules",
+        name: "Revisability",
+        tools: [
+          "living-documentation-tools",
+          "deliberation-tools",
+          "capacity-planning-tools",
+          "governance-codes",
         ],
       },
       {
         id: "contributive-accounting",
         name: "Contributive accounting",
-        tools: ["contribution-tracking-tools", "capacity-planning-tools"],
+        tools: ["contribution-tracking-tools", "deliberation-tools"],
       },
       {
         id: "open-recognition",
         name: "Open recognition",
-        tools: ["contribution-tracking-tools"],
-      },
-      {
-        id: "open-working",
-        name: "Open working",
-        tools: ["living-documentation-tools"],
+        tools: [
+          "capacity-planning-tools",
+          "contribution-tracking-tools",
+          "peer-recognition-tools",
+          "living-documentation-tools",
+          "deliberation-tools",
+        ],
       },
       {
         id: "participatory-budgeting",
         name: "Participatory budgeting",
-        tools: ["participatory-budgeting-tools"],
-      },
-      {
-        id: "reputation-based-voting",
-        name: "Reputation-based voting",
-        tools: ["digital-voting-tools", "contribution-tracking-tools"],
-      },
-      {
-        id: "quadratic-voting",
-        name: "Quadratic voting",
-        tools: ["digital-voting-tools"],
-      },
-      {
-        id: "weighted-voting",
-        name: "Weighted voting",
-        tools: ["digital-voting-tools"],
+        tools: [
+          "participatory-budgeting-tools",
+          "deliberation-tools",
+          "living-documentation-tools",
+        ],
       },
     ],
     tools: [
-      { id: "general-assembly", name: "General Assembly" },
       { id: "group-facilitation-methods", name: "Group facilitation methods" },
-      { id: "board-of-directors", name: "Board of Directors" },
       { id: "governance-codes", name: "Governance codes" },
       { id: "deliberation-tools", name: "Deliberation tools" },
       { id: "digital-voting-tools", name: "Digital voting tools" },
@@ -210,6 +310,8 @@ const OrganizationalMapping = () => {
         id: "contribution-tracking-tools",
         name: "Contribution tracking tools",
       },
+      { id: "project-management-tools", name: "Project management tools" },
+      { id: "peer-recognition-tools", name: "Peer recognition tools" },
     ],
   };
 
